@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Graph Translator & Anki Studio</title>
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body class="dark-theme">
+  <div id="app" class="app-container hidden">
+
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <img src="./icon.svg" class="logo-img" alt="icon" />
+        <div>
+          <h1>Graph Translator & Anki Studio</h1>
+          <p class="subtitle">Dịch Graph • Tra Từ Điển • Học Thẻ Nhớ</p>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <label class="checkbox-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-muted);background:rgba(255,255,255,0.05);padding:4px 10px;border-radius:20px;border:1px solid var(--panel-border);" title="Rê chuột vào từ vựng đã lưu/đã tra trên trang Logseq để xem nghĩa nổi">
+          <input type="checkbox" id="toggle-hover-translate-header" checked />
+          <span style="font-weight:600;color:#a5b4fc;">✨ Hover xem nghĩa</span>
+        </label>
+        <label class="checkbox-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-muted);background:rgba(255,255,255,0.05);padding:4px 10px;border-radius:20px;border:1px solid var(--panel-border);" title="Tự động hiện Popup tra từ khi dùng chuột bôi đen trong Logseq">
+          <input type="checkbox" id="toggle-auto-popup-header" checked />
+          <span style="font-weight:600;color:var(--text-main);">⚡ Bôi đen tra từ</span>
+        </label>
+        <button id="close-plugin-btn" class="icon-btn" title="Đóng (Esc)">✕</button>
+      </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="anki-tab">
+        <span class="tab-icon">🎴</span> Ôn Tập Anki <span id="anki-due-badge" class="badge">0</span>
+      </button>
+      <button class="tab-btn" data-tab="translator-tab">
+        <span class="tab-icon">🌐</span> Dịch Toàn Bộ Graph
+      </button>
+    </nav>
+
+    <!-- Tab Content -->
+    <main class="tab-content-container">
+
+      <!-- ─── TAB 1: ANKI FLASHCARDS & VOCABULARY OUTLINER ─── -->
+      <section id="anki-tab" class="tab-pane active">
+        <div class="grid-2col" style="grid-template-columns: 320px 1fr; gap: 16px; height: 100%;">
+
+          <!-- Left Column: Hierarchical Deck Tree -->
+          <div class="card-panel flex-col" style="padding: 14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--panel-border);padding-bottom:8px;">
+              <h2 style="font-size:14px;border:none;padding:0;"><span class="icon">📂</span> Cây Bộ Thẻ (Decks)</h2>
+              <button id="create-new-deck-btn" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;" title="Tạo Deck phân cấp mới (VD: Y Học/Tim Mạch)">➕ Deck Mới</button>
+            </div>
+
+            <!-- All Decks Root Button -->
+            <div id="deck-node-all" class="deck-tree-item active" style="margin-top:8px;">
+              <div class="deck-item-left">
+                <span class="deck-icon">📚</span>
+                <strong class="deck-name">Tất cả từ vựng</strong>
+              </div>
+              <span id="deck-all-count-badge" class="badge" style="background:#6366f1;">0</span>
+            </div>
+
+            <!-- Dynamic Deck Tree Container -->
+            <div id="deck-tree-container" class="deck-tree-scroll" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px;margin-top:6px;padding-right:2px;">
+              <!-- Rendered dynamically -->
+            </div>
+
+            <!-- Bottom Sync, Backup & Restore Actions -->
+            <div style="border-top:1px solid var(--panel-border);padding-top:10px;margin-top:auto;display:flex;flex-direction:column;gap:6px;">
+              <button id="anki-scan-graph-btn" class="btn btn-accent btn-sm" style="width:100%;font-size:11px;" title="Tự động quét và nhập tất cả các khối có gắn #card trong Graph vào cây Deck">
+                📥 Quét Thẻ Từ Graph (#card)
+              </button>
+              <button id="anki-export-desktop-btn" class="btn btn-primary btn-sm" style="width:100%;font-size:11px;" title="Xuất file .txt (TSV) để Import 1-click vào Anki Desktop (tự tạo deck con ::)">
+                📦 Xuất File Cho Anki Desktop
+              </button>
+              <button id="sync-anki-to-graph-btn" class="btn btn-success btn-sm" style="width:100%;font-size:11px;" title="Xuất toàn bộ cấu trúc phân cấp vào Logseq [[Vocabulary Deck]]">
+                🔄 Xuất ra Logseq Outliner #card
+              </button>
+              <div style="display:flex;gap:6px;margin-top:2px;">
+                <button id="anki-backup-btn" class="btn btn-secondary btn-sm flex-1" style="font-size:11px;padding:3px 6px;" title="Tải file sao lưu toàn bộ từ vựng & dữ liệu SM-2 (.json)">
+                  💾 Backup JSON
+                </button>
+                <button id="anki-restore-btn" class="btn btn-secondary btn-sm flex-1" style="font-size:11px;padding:3px 6px;" title="Khôi phục danh sách từ vựng từ file backup .json">
+                  📥 Khôi Phục
+                </button>
+                <input type="file" id="anki-restore-file-input" accept=".json" style="display:none;" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Study Arena & Card Manager -->
+          <div class="card-panel flex-col" style="padding: 16px;">
+            <!-- Active Deck Header & Breadcrumb -->
+            <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--panel-border);padding-bottom:10px;">
+              <div style="flex:1;max-width:65%;">
+                <div id="active-deck-breadcrumb" style="font-size:14px;font-weight:700;color:var(--text-main);display:flex;align-items:center;gap:6px;">
+                  <span>📂</span> <span>Tất cả từ vựng</span>
+                </div>
+                <div id="active-deck-stats-text" style="font-size:12px;color:var(--text-muted);margin-top:2px;">
+                  0 từ • 0 cần ôn hôm nay
+                </div>
+                <!-- Visual Multi-color Progress Bar -->
+                <div id="active-deck-progress-bar" style="display:flex;height:4px;border-radius:2px;overflow:hidden;background:rgba(255,255,255,0.08);margin-top:5px;width:100%;" title="Tiến độ thẻ: Đỏ (Cần ôn), Xanh lam (Mới), Cam (Đang học), Xanh lá (Đã thuộc)">
+                  <div id="prog-due" style="background:#ef4444;width:0%;transition:width 0.3s ease;"></div>
+                  <div id="prog-new" style="background:#3b82f6;width:0%;transition:width 0.3s ease;"></div>
+                  <div id="prog-learning" style="background:#f59e0b;width:0%;transition:width 0.3s ease;"></div>
+                  <div id="prog-mastered" style="background:#10b981;width:0%;transition:width 0.3s ease;"></div>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button id="tab-sub-study-btn" class="btn btn-primary btn-sm active-subtab">🎴 Ôn Tập</button>
+                <button id="tab-sub-list-btn" class="btn btn-secondary btn-sm">📋 Danh Sách Từ</button>
+              </div>
+            </div>
+
+            <!-- SUB-VIEW 1: Flashcard Player Arena -->
+            <div id="subview-study" class="flex-col flex-1" style="display:flex;gap:10px;overflow:hidden;">
+              <!-- Flexible Study Mode Bar (Anki Custom Study / Cram / Filtered) -->
+              <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.03);padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);flex-shrink:0;flex-wrap:wrap;gap:8px;">
+                <div style="display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap;">
+                  <span style="font-weight:600;color:var(--text-muted);">🎯 Chế độ học:</span>
+                  <select id="anki-study-mode-select" class="form-control btn-sm" style="font-size:12px;padding:3px 8px;background:#0f172a;color:#fff;border:1px solid rgba(99,102,241,0.3);">
+                    <option value="due">🔴 Cần ôn hôm nay (SM-2 Chuẩn)</option>
+                    <option value="cram">⚡ Ôn tập toàn bộ (Cram Mode)</option>
+                    <option value="difficult">🟠 Chỉ ôn từ khó / Đang học</option>
+                    <option value="new_only">🔵 Chỉ học từ mới</option>
+                    <option value="mastered_review">🟢 Ôn lại từ đã thuộc</option>
+                  </select>
+                  <label class="checkbox-label" style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--text-muted);" title="Tự động phát âm Google TTS khi chuyển sang thẻ từ mới">
+                    <input type="checkbox" id="anki-auto-tts-cb" />
+                    <span>🔊 Tự phát âm</span>
+                  </label>
+                </div>
+                <div id="study-progress-count" style="font-size:11px;color:#a5b4fc;font-weight:600;">Thẻ 0 / 0</div>
+              </div>
+
+              <div id="anki-player-card" class="flashcard-container flex-1" style="min-height:280px;">
+                <div id="flashcard-box" class="flashcard">
+                  <div class="flashcard-front">
+                    <!-- Logseq Outliner Block Hierarchy Breadcrumb -->
+                    <div style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:8px;">
+                      <div id="card-front-hierarchy" class="card-outliner-path" style="display:flex;align-items:center;gap:4px;font-size:11px;color:#a5b4fc;font-weight:600;flex-wrap:wrap;">
+                        <span class="outliner-bullet">●</span>
+                        <span id="card-front-deck-badge" class="file-badge config" style="font-size:10px;">Inbox</span>
+                      </div>
+                      <button id="anki-audio-btn" class="icon-btn" style="font-size:16px;padding:3px 6px;background:rgba(99,102,241,0.15);border-radius:6px;color:#a5b4fc;" title="Phát âm Google TTS (Phím tắt: R hoặc 5)">🔊 <span style="font-size:10px;opacity:0.8;">[R]</span></button>
+                    </div>
+
+                    <h3 id="card-front-word" class="card-word" style="display:flex;align-items:center;gap:8px;"></h3>
+                    <div style="display:flex;gap:6px;align-items:center;margin:4px 0;">
+                      <span id="card-front-pos" class="card-pos"></span>
+                      <span id="card-front-phonetic" class="card-phonetic"></span>
+                    </div>
+                    <p id="card-front-context" class="card-context"></p>
+                  </div>
+                  <div id="flashcard-back" class="flashcard-back hidden">
+                    <div class="card-tag back-tag">Back (Nghĩa &amp; Định nghĩa)</div>
+                    <h3 id="card-back-translation" class="card-translation"></h3>
+                    <p id="card-back-definition" class="card-definition"></p>
+                  </div>
+                </div>
+
+                <div class="flashcard-controls">
+                  <button id="show-answer-btn" class="btn btn-primary btn-large" style="display:inline-flex;gap:10px;align-items:center;">
+                    <span>👁️ Hiện Đáp Án</span>
+                    <kbd class="kbd-badge">Space / Enter</kbd>
+                  </button>
+                  <div id="sm2-ratings-row" class="sm2-ratings-row hidden">
+                    <button class="btn btn-rating rating-again" data-rating="again" title="Phím tắt: 1">
+                      <div class="rating-btn-top"><span>🔴 Again</span><kbd class="kbd-badge">1</kbd></div>
+                      <small>&lt;1 ngày</small>
+                    </button>
+                    <button class="btn btn-rating rating-hard" data-rating="hard" title="Phím tắt: 2">
+                      <div class="rating-btn-top"><span>🟠 Hard</span><kbd class="kbd-badge">2</kbd></div>
+                      <small>Khó</small>
+                    </button>
+                    <button class="btn btn-rating rating-good" data-rating="good" title="Phím tắt: 3 hoặc Space">
+                      <div class="rating-btn-top"><span>🟢 Good</span><kbd class="kbd-badge">3</kbd></div>
+                      <small>Tốt</small>
+                    </button>
+                    <button class="btn btn-rating rating-easy" data-rating="easy" title="Phím tắt: 4">
+                      <div class="rating-btn-top"><span>🔵 Easy</span><kbd class="kbd-badge">4</kbd></div>
+                      <small>Dễ</small>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div id="anki-empty-state" class="empty-state hidden">
+                <div class="empty-icon">🎉</div>
+                <h3>Hoàn thành lịch ôn SM-2 hôm nay!</h3>
+                <p style="color:var(--text-muted);font-size:13px;">Bạn có thể tiếp tục luyện tập thêm với các chế độ nâng cao bên dưới:</p>
+                <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;justify-content:center;">
+                  <button id="empty-cram-btn" class="btn btn-primary btn-sm">⚡ Ôn tập toàn bộ (Cram Mode)</button>
+                  <button id="empty-difficult-btn" class="btn btn-secondary btn-sm">🟠 Ôn từ khó / đang học</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- SUB-VIEW 2: Card List Manager -->
+            <div id="subview-list" class="flex-col flex-1 hidden" style="overflow:hidden;gap:10px;">
+              <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
+                <input type="text" id="card-search-input" class="form-control flex-1" placeholder="🔍 Tìm kiếm từ vựng, nghĩa, ngữ cảnh..." style="font-size:12px;" />
+                <select id="card-status-filter" class="form-control" style="width:130px;font-size:12px;">
+                  <option value="all">Tất cả trạng thái</option>
+                  <option value="due">🔴 Cần ôn</option>
+                  <option value="new">🔵 Mới</option>
+                  <option value="learning">🟠 Đang học</option>
+                  <option value="mastered">🟢 Đã thuộc</option>
+                </select>
+                <select id="anki-sort-select" class="form-control" style="width:135px;font-size:12px;" title="Sắp xếp danh sách từ vựng">
+                  <option value="newest">🕒 Mới nhất</option>
+                  <option value="az">🔤 Từ A -> Z</option>
+                  <option value="due">📅 Cần ôn trước</option>
+                  <option value="ease">⚡ Độ khó cao</option>
+                </select>
+              </div>
+
+              <!-- Batch Action Bar -->
+              <div id="batch-action-bar" style="display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);flex-shrink:0;">
+                <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:600;color:var(--text-muted);">
+                    <input type="checkbox" id="select-all-cards-cb" style="accent-color:var(--primary);cursor:pointer;" />
+                    <span>Chọn tất cả</span>
+                  </label>
+                  <span id="selected-cards-count" style="font-size:11px;color:#a5b4fc;">(0 đã chọn)</span>
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button id="batch-move-btn" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;">📂 Chuyển Deck</button>
+                  <button id="batch-reset-btn" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;">🔄 Đặt lại ôn</button>
+                  <button id="batch-delete-btn" class="btn btn-danger btn-sm" style="font-size:11px;padding:3px 8px;background:#ef4444;color:#fff;">🗑️ Xóa đã chọn</button>
+                </div>
+              </div>
+
+              <div id="anki-cards-list" class="cards-list flex-1" style="overflow-y:auto;"></div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── TAB 2: GRAPH TRANSLATOR ─── -->
+      <section id="translator-tab" class="tab-pane">
+        <div class="grid-2col">
+
+          <!-- Left: Source Graph & Translation Config Panel -->
+          <div class="card-panel">
+            <h2>
+              <span class="icon">📁</span> Chọn Graph Nguồn & Dịch Thuật
+            </h2>
+
+            <!-- 1. Source Graph Selector -->
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label style="font-weight: 600; font-size: 13px; color: var(--text-main); display: flex; align-items: center; justify-content: space-between;">
+                <span>1. Chọn Graph Nguồn Cần Dịch:</span>
+                <button id="open-file-preview-btn" class="btn btn-secondary btn-sm hidden" style="font-size: 11px; padding: 2px 8px;">📋 Xem & Lọc File (0)</button>
+              </label>
+              <div class="pick-row" style="margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap;">
+                <button id="use-active-graph-btn" class="btn btn-accent btn-sm" title="Quét toàn bộ pages, journals và assets trong Graph hiện tại đang mở trên Logseq">📌 Graph Đang Mở</button>
+                <button id="select-source-folder-btn" class="btn btn-secondary btn-sm" title="Chọn thư mục Graph từ máy tính">📁 Chọn Thư Mục...</button>
+                <button id="input-source-path-btn" class="btn btn-secondary btn-sm" title="Nhập trực tiếp đường dẫn ổ đĩa">✏️ Nhập Path...</button>
+              </div>
+              <div id="source-path-input-row" class="pick-row hidden" style="margin-top: 8px; display: flex; gap: 6px;">
+                <input type="text" id="source-path-custom-input" class="form-control flex-1" placeholder="Nhập đường dẫn Graph (VD: D:\MyLogseqGraph)..." />
+                <button id="confirm-source-path-btn" class="btn btn-accent btn-sm">Xác Nhận</button>
+              </div>
+              <input type="file" id="source-file-input" webkitdirectory directory multiple style="display:none;" />
+              <div id="source-folder-path" class="folder-path-display" style="margin-top: 8px; font-weight: 500;">Chưa chọn (Bấm nút ở trên để chọn Graph nguồn)</div>
+            </div>
+
+            <!-- 2. Target Language & Engine -->
+            <div class="form-group" style="margin-bottom: 14px;">
+              <label style="font-weight: 600; font-size: 13px; color: var(--text-main);">2. Ngôn Ngữ Dịch Đích & Máy Dịch:</label>
+              <div class="pick-row" style="gap: 8px; margin-top: 6px;">
+                <select id="target-lang-select" class="form-control flex-1">
+                  <option value="vi" selected>🇻🇳 Tiếng Việt</option>
+                  <option value="en">🇬🇧 English</option>
+                  <option value="zh">🇨🇳 Trung Quốc</option>
+                  <option value="ja">🇯🇵 Nhật Bản</option>
+                  <option value="ko">🇰🇷 Hàn Quốc</option>
+                  <option value="fr">🇫🇷 Tiếng Pháp</option>
+                  <option value="de">🇩🇪 Tiếng Đức</option>
+                  <option value="es">🇪🇸 Tây Ban Nha</option>
+                </select>
+                <select id="engine-select" class="form-control flex-1">
+                  <option value="google" selected>🆓 Google Translate</option>
+                  <option value="mymemory">🆓 MyMemory API</option>
+                  <option value="openai">🤖 OpenAI (ChatGPT)</option>
+                  <option value="deepl">🔵 DeepL API</option>
+                  <option value="libretranslate">🟢 LibreTranslate</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="api-key-container" class="form-group hidden" style="margin-bottom: 14px;">
+              <label style="font-weight: 600; font-size: 13px; color: var(--text-main);">API Key:</label>
+              <input type="password" id="api-key-input" class="form-control" style="margin-top: 4px;" placeholder="Nhập API Key..." />
+            </div>
+
+            <!-- 3. Translation Options & Cache -->
+            <div class="options-bar-panel" style="background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); padding: 10px 12px; border-radius: var(--radius-md); margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-weight: 600; font-size: 13px; color: var(--text-main); display:flex; align-items:center; justify-content:space-between;">
+                <span>⚙️ Tùy Chọn Dịch & Bộ Nhớ Cache</span>
+                <button id="clear-cache-now-btn" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px; color: var(--warning);" title="Xóa ngay bộ nhớ dịch thuật đã lưu">🧹 Xóa Cache</button>
+              </div>
+
+              <div class="checkboxes-group" style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+                <label class="checkbox-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;" title="Bật tùy chọn này để xóa cache và dịch lại từ đầu">
+                  <input type="checkbox" id="opt-clear-cache" />
+                  <span style="color: #f59e0b; font-weight: 600; font-size: 12px;">☑️ Dịch lại từ đầu</span>
+                </label>
+                <label class="checkbox-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                  <input type="checkbox" id="opt-translate-links" checked />
+                  <span style="font-size: 12px;">Dịch <code>[[Link]]</code></span>
+                </label>
+                <label class="checkbox-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                  <input type="checkbox" id="opt-translate-props" />
+                  <span style="font-size: 12px;">Dịch Properties</span>
+                </label>
+                <label class="checkbox-label" style="display:flex; align-items:center; gap:6px; cursor:pointer;" title="Rê chuột vào từ vựng đã dịch trên trang Logseq để xem nghĩa và nghe phát âm">
+                  <input type="checkbox" id="opt-hover-translate" checked />
+                  <span style="font-size: 12px; color: #a5b4fc; font-weight: 600;">✨ Hover xem nghĩa</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons-row" style="display: flex; gap: 8px;">
+              <button id="start-translation-btn" class="btn btn-primary btn-large flex-1">
+                🚀 Bắt Đầu Dịch & Xuất Gói .ZIP
+              </button>
+              <button id="pause-translation-btn" class="btn btn-secondary" disabled>⏸️ Tạm Dừng</button>
+              <button id="cancel-translation-btn" class="btn btn-danger" disabled>⏹️ Hủy</button>
+            </div>
+          </div>
+
+          <!-- Right: Progress & Verification Terminal -->
+          <div class="card-panel flex-col">
+            <h2><span class="icon">📊</span> Tiến Trình & Kết Quả</h2>
+
+            <!-- Progress Bar Card -->
+            <div class="progress-card">
+              <div class="progress-info">
+                <span id="progress-status-text" class="status-text">Sẵn sàng</span>
+                <span id="progress-percent-text" class="percent-text">0%</span>
+              </div>
+              <div class="progress-bar-track">
+                <div id="progress-bar-inner" class="progress-bar-fill" style="width: 0%;"></div>
+              </div>
+              <div class="stats-row">
+                <div class="stat-item">
+                  <span class="stat-label">File Đã Xử Lý:</span>
+                  <span id="stat-files-val" class="stat-value">0 / 0</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Khối (Blocks) Đã Dịch:</span>
+                  <span id="stat-blocks-val" class="stat-value">0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Automatic Integrity Verification Summary Box -->
+            <div id="verification-box" class="verification-box" style="margin-bottom: 12px; padding: 10px 14px; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); border-radius: 8px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 4px;">
+                <span style="font-weight: 600; font-size: 12px; color: var(--success);">🛡️ Kiểm Thư Mục & Ngôn Ngữ Tự Động:</span>
+                <span id="verification-status-badge" class="badge" style="background: rgba(16,185,129,0.2); color: var(--success);">Đã Bật</span>
+              </div>
+              <div id="verification-summary-text" style="font-size: 11px; color: #cbd5e1;">Đầy đủ cấu trúc pages/, journals/, assets/, logseq/...</div>
+            </div>
+
+            <div class="log-terminal-header">
+              <span>📋 Nhật Ký Hoạt Động (Terminal Log)</span>
+              <button id="clear-logs-btn" class="btn-text">Xóa</button>
+            </div>
+            <div id="log-terminal" class="log-terminal" style="flex: 1; min-height: 200px;">
+              <div class="log-line info">[System] Sẵn sàng. Hãy chọn Graph nguồn và nhấn "Bắt Đầu Dịch & Xuất Gói .ZIP".</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Edit Card Modal -->
+  <div id="edit-card-modal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width:540px;width:92vw;">
+      <div class="modal-header">
+        <h3 style="display:flex;align-items:center;gap:6px;">✏️ Chỉnh Sửa Thẻ Từ Vựng</h3>
+        <button id="close-edit-card-btn" class="icon-btn">✖</button>
+      </div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px;max-height:75vh;overflow-y:auto;">
+        <input type="hidden" id="edit-card-id" />
+        <div class="form-group">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Từ vựng (Word / Phrase):</label>
+          <input type="text" id="edit-card-word" class="form-control" />
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Từ loại (Part of speech):</label>
+            <input type="text" id="edit-card-pos" class="form-control" placeholder="noun, verb..." />
+          </div>
+          <div class="form-group flex-1">
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Phiên âm (Phonetic):</label>
+            <input type="text" id="edit-card-phonetic" class="form-control" placeholder="/phonetic/" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Nghĩa tiếng Việt (Translation):</label>
+          <textarea id="edit-card-translation" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Định nghĩa (Definition):</label>
+          <textarea id="edit-card-definition" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Câu ngữ cảnh (Context Sentence):</label>
+          <textarea id="edit-card-context" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Bộ thẻ (Deck Path):</label>
+            <input type="text" id="edit-card-deck" class="form-control" list="popup-deck-datalist" placeholder="Inbox hoặc Y Học/Tim Mạch" />
+          </div>
+          <div class="form-group" style="width:140px;">
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);">Trạng thái:</label>
+            <select id="edit-card-status" class="form-control">
+              <option value="new">🔵 new (Mới)</option>
+              <option value="learning">🟠 learning (Đang học)</option>
+              <option value="mastered">🟢 mastered (Đã thuộc)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;">
+        <button id="cancel-edit-card-btn" class="btn btn-secondary">Hủy</button>
+        <button id="save-edit-card-btn" class="btn btn-primary">💾 Lưu Thay Đổi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Preview Checklist Modal -->
+  <div id="file-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>📋 Chọn File Cần Dịch Trong Graph Nguồn</h3>
+        <button id="close-file-modal-btn" class="icon-btn">✖</button>
+      </div>
+
+      <div class="modal-toolbar">
+        <input type="text" id="file-search-input" class="form-control flex-1" placeholder="🔍 Lọc file theo tên (VD: pages/, journals/...)..." />
+        <button id="toggle-select-all-btn" class="btn btn-secondary">Toggle Tất Cả</button>
+      </div>
+
+      <div id="file-list-container" class="file-list-scroll">
+        <!-- Checklist items rendered dynamically -->
+      </div>
+
+      <div class="modal-footer">
+        <span class="section-desc" style="margin-right:auto;">Đã chọn <strong id="modal-selected-count">0</strong>/<span id="modal-total-count">0</span> file</span>
+        <button id="confirm-file-selection-btn" class="btn btn-primary">✅ Xác Nhận</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dictionary Quick Popup (compact card, bottom-right) -->
+  <div id="dict-popup-modal" class="popup-overlay hidden">
+    <div class="popup-card">
+      <div class="modal-header" style="padding:10px 14px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:16px;">🔍</span>
+          <span id="popup-dict-title" style="font-size:13px;font-weight:600;color:var(--text-muted);">Tra từ</span>
+          <button id="popup-toggle-auto-btn" class="btn btn-secondary btn-sm" style="font-size:10px;padding:1px 6px;margin-left:4px;border-radius:12px;background:rgba(16,185,129,0.15);color:var(--success);border:1px solid rgba(16,185,129,0.3);" title="Bật/Tắt tính năng tự động hiện popup khi bôi đen trong Logseq">⚡ Auto: BẬT</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <select id="popup-target-lang-select" class="form-control btn-sm" style="padding:2px 6px;font-size:11px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15);">
+            <option value="vi">🇻🇳 VI</option>
+            <option value="en">🇬🇧 EN</option>
+            <option value="zh">🇨🇳 ZH</option>
+            <option value="ja">🇯🇵 JA</option>
+            <option value="ko">🇰🇷 KO</option>
+            <option value="fr">🇫🇷 FR</option>
+            <option value="de">🇩🇪 DE</option>
+            <option value="es">🇪🇸 ES</option>
+          </select>
+          <button id="close-dict-popup-btn" class="icon-btn" style="font-size:14px;">✖</button>
+        </div>
+      </div>
+
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px;">
+        <!-- Header Word / Phrase & Actions -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div style="min-width:0;flex:1;">
+            <div id="popup-word" class="selectable-text" style="font-size:15px;font-weight:600;color:#fff;word-break:break-word;user-select:text;cursor:text;line-height:1.5;background:rgba(255,255,255,0.03);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);" title="💡 Bôi đen bất kỳ từ hoặc cụm từ con ở đây để tra ngay!">word</div>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+              <span id="popup-pos" class="file-badge page" style="font-size:9px;">noun</span>
+              <span id="popup-phonetic" style="font-size:12px;color:var(--text-muted);">/phonetic/</span>
+              <button id="popup-audio-btn" class="icon-btn" title="Phát âm Google TTS (Phím tắt: R hoặc Alt+R)" style="font-size:13px;padding:2px 5px;background:rgba(99,102,241,0.15);border-radius:4px;color:#a5b4fc;">🔊 <kbd class="kbd-badge" style="font-size:9px;opacity:0.85;">[R]</kbd></button>
+              <button id="popup-whole-line-btn" class="btn btn-secondary btn-sm hidden" style="padding:2px 8px;font-size:11px;background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.4);" title="Quay lại bản dịch toàn bộ câu ban đầu (Phím tắt: Ctrl+Z hoặc Alt+W)">📄 Cả cụm <kbd class="kbd-badge" style="font-size:9px;opacity:0.85;">[Ctrl+Z]</kbd></button>
+            </div>
+          </div>
+          <button id="popup-add-anki-btn" class="btn btn-primary btn-sm" style="white-space:nowrap;display:inline-flex;align-items:center;gap:4px;" title="Lưu Thẻ Anki (Phím tắt: Ctrl+S hoặc Alt+S)">
+            <span>⭐ Lưu Anki</span>
+            <kbd class="kbd-badge" style="font-size:9px;background:rgba(255,255,255,0.2);padding:1px 4px;border-radius:3px;">Ctrl+S</kbd>
+          </button>
+        </div>
+
+        <!-- Editable Translation -->
+        <div style="background:rgba(16,185,129,0.12);padding:8px 10px;border-radius:8px;border:1px solid rgba(16,185,129,0.3);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="font-size:10px;color:var(--text-muted);font-weight:600;">DỊCH NGHĨA (Có thể sửa trước khi lưu):</span>
+            <span style="font-size:10px;color:var(--success);opacity:0.8;">✏️ Tùy chỉnh</span>
+          </div>
+          <textarea id="popup-translation-input" class="form-control" rows="2" style="font-size:14px;font-weight:600;color:var(--success);background:rgba(0,0,0,0.25);border:1px solid rgba(16,185,129,0.4);padding:8px 10px;border-radius:6px;width:100%;resize:none;line-height:1.4;font-family:var(--font);overflow:hidden;" placeholder="Nhập nghĩa dịch..."></textarea>
+        </div>
+
+        <!-- Deck Category Selector -->
+        <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.04);padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);">
+          <span style="font-size:11px;color:#a5b4fc;font-weight:600;white-space:nowrap;">📂 Bộ Thẻ (Deck):</span>
+          <input id="popup-deck-input" list="popup-deck-datalist" style="flex:1;background:transparent;border:none;color:#f8fafc;font-size:12px;font-weight:600;outline:none;" placeholder="Inbox (VD: Y Học/Tim Mạch)" />
+          <datalist id="popup-deck-datalist"></datalist>
+        </div>
+
+        <!-- Definitions List -->
+        <div>
+          <div style="font-size:10px;color:var(--text-muted);font-weight:600;margin-bottom:4px;">ĐỊNH NGHĨA &amp; VÍ DỤ:</div>
+          <ul id="popup-definitions-list" style="padding-left:16px;font-size:12px;color:#cbd5e1;display:flex;flex-direction:column;gap:4px;"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Word Hover Tooltip (Appears when hovering pre-translated words) -->
+  <div id="hover-word-tooltip" class="hover-tooltip hidden">
+    <div class="hover-tooltip-content">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="display:flex;align-items:baseline;gap:6px;min-width:0;">
+          <span id="hover-word-title" class="hover-word-title" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">word</span>
+          <span id="hover-word-phonetic" class="hover-word-phonetic">/phonetic/</span>
+        </div>
+        <button id="hover-audio-btn" class="icon-btn hover-audio-btn" title="Phát âm Google TTS (Click)">🔊</button>
+      </div>
+      <div id="hover-word-trans" class="hover-word-trans">Nghĩa tiếng Việt</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;gap:6px;">
+        <span id="hover-deck-badge" class="file-badge config" style="font-size:9px;">📂 Inbox</span>
+        <button id="hover-detail-btn" class="btn-text" style="font-size:10px;color:#93c5fd;cursor:pointer;">🔍 Tra chi tiết</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

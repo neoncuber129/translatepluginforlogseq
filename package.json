@@ -1,0 +1,27 @@
+{
+  "name": "logseq-graph-translator-anki",
+  "version": "1.0.0",
+  "description": "Logseq Plugin: Translate source graph to destination graph, look up words, and learn Anki flashcards with SM-2 Spaced Repetition",
+  "main": "dist/index.html",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && copy icon.svg dist\\icon.svg",
+    "preview": "vite preview",
+    "sync": "node scripts/sync-server.mjs"
+  },
+  "logseq": {
+    "id": "logseq-graph-translator-anki",
+    "title": "Graph Translator & Anki",
+    "icon": "./icon.svg",
+    "main": "dist/index.html"
+  },
+  "dependencies": {
+    "@logseq/libs": "^0.0.15",
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.1.4"
+  }
+}
